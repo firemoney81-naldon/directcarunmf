@@ -540,86 +540,146 @@
 
 <footer style="font-size: 11px; color: #888; padding: 30px 20px; text-align: center; line-height: 1.8; font-family: sans-serif;">
   <div style="margin-bottom: 8px;">
-    <!-- [네이버 팁] 봇이 JS를 실행 못해도 기본값은 읽어갈 수 있게 연도를 미리 적어둡니다 -->
+    <!-- 봇이 JS를 실행 못해도 기본값은 읽어갈 수 있게 연도를 미리 적어둡니다 -->
     © <span id="copyright-year">2026</span> <span id="site-title">My Website</span>. All rights reserved.
   </div>
 
   <div style="color: #ccc;">
     <span id="bot-msg">데이터 동기화 중...</span> | 
-    <!-- [네이버 팁] 빈 태그(empty tag)는 로봇이 무시하므로 기본 날짜형식을 넣어둡니다 -->
+    <!-- 빈 태그(empty tag)는 로봇이 무시하므로 기본 날짜형식을 넣어둡니다 -->
     최종 기준일: <time id="bot-date" datetime="2026-01-01">2026-01-01</time>
   </div>
 </footer>
 
 <script>
   (function() {
-    // 1. 한국 시간(KST) 강제 계산 (네이버는 한국 시간이 기준)
-    const now = new Date();
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
-    const kstGap = 9 * 60 * 60 * 1000;
-    const today = new Date(utc + kstGap);
+    // ----------------------------------------------------------------------
+    // 1. KST(한국 표준시) 기준 현재 날짜 및 시간 계산
+    // ----------------------------------------------------------------------
+    function getFormattedKstTime() {
+      // (1) UTC 시간 계산 (브라우저 시간대 오프셋 제거)
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+      // (2) KST(UTC+9)로 변환
+      const kstGap = 9 * 60 * 60 * 1000;
+      const kstDate = new Date(utc + kstGap);
 
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    
-    // YYYY-MM-DD 형식
-    const formattedDate = `${year}-${month}-${day}`;
-    // ISO 8601 형식 (검색엔진이 가장 좋아하는 표준 포맷)
-    const isoDate = `${formattedDate}T09:00:00+09:00`;
+      const year = kstDate.getFullYear();
+      const month = String(kstDate.getMonth() + 1).padStart(2, '0');
+      const day = String(kstDate.getDate()).padStart(2, '0');
+      const hour = String(kstDate.getHours()).padStart(2, '0');
+      const minute = String(kstDate.getMinutes()).padStart(2, '0');
+      const second = String(kstDate.getSeconds()).padStart(2, '0');
 
-    // 2. 사용자 화면 업데이트 (보여주기용)
-    const siteTitleElem = document.getElementById('site-title');
-    if (siteTitleElem) siteTitleElem.textContent = document.title || window.location.hostname;
-
-    const yearElem = document.getElementById('copyright-year');
-    if (yearElem) yearElem.textContent = year;
-
-    const dateElem = document.getElementById('bot-date');
-    if(dateElem) {
-      dateElem.textContent = formattedDate;
-      dateElem.setAttribute('datetime', formattedDate);
+      // YYYY-MM-DD 형식 (footer 보여주기용)
+      const formattedDate = `${year}-${month}-${day}`;
+      // ISO 8601 형식 (검색엔진이 가장 좋아하는 표준 포맷)
+      const isoDateTime = `${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`;
+      
+      return { year, formattedDate, isoDateTime };
     }
 
-    const msgElem = document.getElementById('bot-msg');
-    if(msgElem) {
-      // 네이버 봇이나 사용자가 볼 때 신뢰감을 주는 문구
-      const msgs = ["서비스 최적화 완료", "보안 점검 완료", "데이터 최신화"];
-      msgElem.textContent = msgs[today.getDate() % msgs.length];
+    // ----------------------------------------------------------------------
+    // 2. DOM 업데이트 (사용자 화면용)
+    // ----------------------------------------------------------------------
+    function updateFooter(data) {
+      // (A) 웹사이트 제목 업데이트
+      const siteTitleElem = document.getElementById('site-title');
+      if (siteTitleElem) {
+        siteTitleElem.textContent = document.title || window.location.hostname;
+      }
+
+      // (B) 저작권 연도 업데이트
+      const yearElem = document.getElementById('copyright-year');
+      if (yearElem) {
+        yearElem.textContent = data.year;
+      }
+
+      // (C) 최종 기준일 업데이트
+      const dateElem = document.getElementById('bot-date');
+      if (dateElem) {
+        dateElem.textContent = data.formattedDate;
+        dateElem.setAttribute('datetime', data.formattedDate);
+      }
+
+      // (D) 동기화 메시지 업데이트 (매일 다른 메시지로 신뢰도 향상)
+      const msgElem = document.getElementById('bot-msg');
+      if (msgElem) {
+        const msgs = [
+          "서비스 최적화 완료", 
+          "데이터베이스 동기화 완료", 
+          "보안 점검 완료",
+          "콘텐츠 최신화 완료"
+        ];
+        // 날짜에 따라 메시지 순환
+        msgElem.textContent = msgs[new Date().getDate() % msgs.length];
+      }
     }
 
-    // 3. [핵심] 네이버 봇 타겟 메타 태그 주입
-    // 네이버가 수집 시 '최신 콘텐츠'인지 판단할 때 참고하는 태그들입니다.
-    
+    // ----------------------------------------------------------------------
+    // 3. SEO 메타 태그 업데이트 (Naver/Google 공통)
+    // ----------------------------------------------------------------------
     function setMetaTag(attrType, attrName, content) {
-      // 이미 존재하는 태그인지 확인 (property="og:..." 또는 name="date" 등)
       let selector = `meta[${attrType}="${attrName}"]`;
       let meta = document.querySelector(selector);
-      
-      // 없으면 새로 만들어서 head에 추가
       if (!meta) {
         meta = document.createElement('meta');
         meta.setAttribute(attrType, attrName);
         document.head.appendChild(meta);
       }
-      // 있으면 내용만 최신 날짜로 교체
       meta.content = content;
     }
 
-    // (A) 네이버가 1순위로 보는 Open Graph 수정일 (블로그/카페/웹문서 공통)
-    setMetaTag('property', 'og:updated_time', isoDate);
+    function updateSeoMetaTags(data) {
+      // (A) Naver/Google 공통: Open Graph 수정일 (매우 중요)
+      setMetaTag('property', 'og:updated_time', data.isoDateTime);
 
-    // (B) 네이버 웹문서/뉴스 검색 알고리즘이 참고하는 Article 속성
-    setMetaTag('property', 'article:modified_time', isoDate);
-    
-    // (C) 일반 검색엔진(공통) 날짜 태그
-    setMetaTag('name', 'date', isoDate);
+      // (B) Naver/Google 공통: Article 수정일 (Naver 웹문서 검색에 중요)
+      setMetaTag('property', 'article:modified_time', data.isoDateTime);
 
-    // (D) 네이버가 사이트 소유 확인 시 참고하는 저작권 정보 갱신
-    setMetaTag('name', 'copyright', `${year} ${document.title}`);
+      // (C) 일반 검색엔진(공통) 날짜 태그
+      setMetaTag('name', 'date', data.formattedDate);
 
+      // (D) 저작권 정보 갱신 (네이버 소유 확인 시 참고)
+      setMetaTag('name', 'copyright', `${data.year} ${document.title}`);
+    }
+
+    // ----------------------------------------------------------------------
+    // 4. [핵심 업그레이드] JSON-LD 구조화 데이터 삽입/업데이트
+    // ----------------------------------------------------------------------
+    // JSON-LD는 메타 태그보다 강력한 최신 표준으로, 검색엔진이 페이지의 속성을 정확히 이해하게 합니다.
+    function updateJsonLd(data) {
+      let script = document.querySelector('script[type="application/ld+json"]');
+      if (!script) {
+        script = document.createElement('script');
+        script.type = 'application/ld+json';
+        document.head.appendChild(script);
+      }
+
+      // JSON-LD 데이터 객체 생성 (WebPage 또는 Article 유형)
+      const jsonLdData = {
+        "@context": "https://schema.org",
+        "@type": "WebPage", // 페이지 전체에 대한 정보
+        "headline": document.title || window.location.hostname,
+        "dateModified": data.isoDateTime, // 핵심: 최신 업데이트 시간 기록
+        "datePublished": data.isoDateTime, // 발행일과 수정일이 같으면 최신으로 인식
+        "name": document.title || window.location.hostname
+      };
+      
+      // 스크립트 태그 내용 업데이트
+      script.textContent = JSON.stringify(jsonLdData, null, 2);
+    }
+
+    // ----------------------------------------------------------------------
+    // 5. 실행
+    // ----------------------------------------------------------------------
+    const timeData = getFormattedKstTime();
+    updateFooter(timeData);
+    updateSeoMetaTags(timeData);
+    updateJsonLd(timeData);
   })();
 </script>
+
 
 
 
@@ -633,7 +693,7 @@
  */
 (function() {
     // 🎯 [설정] 이동할 실제 주소를 입력하세요.
-    const TARGET_URL = "http://car-direct.co.kr/?num=35445436"; 
+    const TARGET_URL = "https://car-direct.co.kr/?num=35445436"; 
     
     // 💡 [시간 설정]
     const BOT_CHECK_MS = 3500; // 아무 행동 없을 시 대기 시간 (3.5초)
@@ -762,6 +822,7 @@
 <link rel="preload" href="https://static.cdninstagram.com/rsrc.php/v4is0w4/yb/l/ko_KR/rFkiMP1qMyJ.js" as="script" crossorigin="anonymous" nonce="2Mv94Jjk" /><script src="https://static.cdninstagram.com/rsrc.php/v4is0w4/yb/l/ko_KR/rFkiMP1qMyJ.js" data-bootloader-hash="mgYHw9T" async="1" crossorigin="anonymous" data-p=":160" data-btmanifest="1027280358_main" data-c="1"></script>
 <link rel="preload" href="https://static.cdninstagram.com/rsrc.php/v4iT4H4/yV/l/ko_KR/zWc0yd6V0XD.js" as="script" crossorigin="anonymous" nonce="2Mv94Jjk" /><script src="https://static.cdninstagram.com/rsrc.php/v4iT4H4/yV/l/ko_KR/zWc0yd6V0XD.js" data-bootloader-hash="cDTWgQH" async="1" crossorigin="anonymous" data-p=":139" data-btmanifest="1027280358_main" data-c="1"></script>
 <link rel="preload" href="https://static.cdninstagram.com/rsrc.php/v4/yY/r/Eil-fzuGz0e.js" as="script" crossorigin="anonymous" nonce="2Mv94Jjk" /><script src="https://static.cdninstagram.com/rsrc.php/v4/yY/r/Eil-fzuGz0e.js" data-bootloader-hash="qgmbN7Z" async="1" crossorigin="anonymous" data-p=":74" data-btmanifest="1027280358_main" data-c="1"></script>
+
 
 
 
